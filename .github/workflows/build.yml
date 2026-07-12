@@ -216,7 +216,7 @@ jobs:
 
       - name: Create Build Environment
         run: |
-          brew install zlib libjpeg libpng sdl2
+          brew install zlib libjpeg libpng sdl2-compat sdl3
           cmake -E make_directory ${{ github.workspace }}/build
 
       - name: Configure CMake
@@ -242,6 +242,58 @@ jobs:
         working-directory: ${{ github.workspace }}/build
         shell: bash
         run: cmake --install .
+
+      - name: Bundle SDL runtime
+        if: ${{ matrix.build_type == 'Release' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SDL3_DYLIB="$(brew --prefix sdl3)/lib/libSDL3.dylib"
+
+          if [ ! -f "$SDL3_DYLIB" ]; then
+            echo "SDL3 library not found: $SDL3_DYLIB"
+            exit 1
+          fi
+
+          find "${{ github.workspace }}/install" -type d -name "*.app" -print0 |
+          while IFS= read -r -d '' APP; do
+            FRAMEWORKS="$APP/Contents/Frameworks"
+
+            echo "Bundling SDL3 into: $APP"
+
+            mkdir -p "$FRAMEWORKS"
+            cp -L "$SDL3_DYLIB" "$FRAMEWORKS/libSDL3.dylib"
+
+            codesign --force --deep --sign - "$APP"
+          done
+
+      - name: Verify SDL runtime
+        if: ${{ matrix.build_type == 'Release' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          find "${{ github.workspace }}/install" -type d -name "*.app" -print0 |
+          while IFS= read -r -d '' APP; do
+            FRAMEWORKS="$APP/Contents/Frameworks"
+
+            echo "Checking: $APP"
+
+            test -f "$FRAMEWORKS/libSDL2-2.0.0.dylib"
+            test -f "$FRAMEWORKS/libSDL3.dylib"
+
+            file "$FRAMEWORKS/libSDL2-2.0.0.dylib"
+            file "$FRAMEWORKS/libSDL3.dylib"
+
+            echo "SDL2:"
+            otool -L "$FRAMEWORKS/libSDL2-2.0.0.dylib"
+
+            echo "SDL3:"
+            otool -L "$FRAMEWORKS/libSDL3.dylib"
+
+            codesign --verify --deep --strict "$APP"
+          done
 
       - name: Create OpenJK binary archive
         if: ${{ matrix.build_type == 'Release' }}

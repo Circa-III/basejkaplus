@@ -3,13 +3,13 @@ name: build dedicated server
 on:
   workflow_dispatch:
   push:
-    branches: [master]
+    branches: [basejkaplus]
     paths-ignore:
       - "**.md"
       - ".gitignore"
       - "docs/*"
   pull_request:
-    branches: [master]
+    branches: [basejkaplus]
     paths-ignore:
       - "**.md"
       - ".gitignore"
@@ -200,7 +200,7 @@ jobs:
           if-no-files-found: error
 
   create-latest:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/basejkaplus'
     needs: [msvc, ubuntu, macos]
     runs-on: ubuntu-22.04
 

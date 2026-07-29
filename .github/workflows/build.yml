@@ -215,19 +215,53 @@ jobs:
           fetch-tags: true
 
       - name: Create Build Environment
+        shell: bash
         run: |
-          brew install zlib libjpeg libpng
+          set -euo pipefail
+
+          brew install libjpeg libpng
+
           cmake -E make_directory "${{ github.workspace }}/build"
+          cmake -E make_directory "${{ github.workspace }}/sdl-build"
+          cmake -E make_directory "${{ github.workspace }}/sdl-prefix"
+
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            SDL_DEPLOYMENT_TARGET="11.0"
+          else
+            SDL_DEPLOYMENT_TARGET="10.9"
+          fi
+
+          git clone \
+            --branch release-2.32.10 \
+            --depth 1 \
+            https://github.com/libsdl-org/SDL.git \
+            "${{ github.workspace }}/SDL2-source"
+
+          cmake \
+            -S "${{ github.workspace }}/SDL2-source" \
+            -B "${{ github.workspace }}/sdl-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/sdl-prefix" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="$SDL_DEPLOYMENT_TARGET" \
+            -DSDL_SHARED=ON \
+            -DSDL_STATIC=OFF \
+            -DSDL_TEST=OFF
+
+          cmake --build "${{ github.workspace }}/sdl-build" \
+            --parallel "$(sysctl -n hw.logicalcpu)"
+
+          cmake --install "${{ github.workspace }}/sdl-build"
 
       - name: Configure CMake
         shell: bash
         working-directory: ${{ github.workspace }}/build
         run: |
           OPTIONS="-DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install"
+          OPTIONS+=" -DCMAKE_PREFIX_PATH=${{ github.workspace }}/sdl-prefix"
           if [ "${{ matrix.portable }}" == "Portable" ]; then
-            OPTIONS+=" -DUseInternalLibs=ON -DBuildPortableVersion=ON"
+            OPTIONS+=" -DUseInternalLibs=ON -DUseInternalSDL2=OFF -DBuildPortableVersion=ON"
           else
-            OPTIONS+=" -DUseInternalLibs=OFF -DUseInternalSDL2=ON -DBuildPortableVersion=OFF"
+            OPTIONS+=" -DUseInternalLibs=OFF -DUseInternalSDL2=OFF -DBuildPortableVersion=OFF"
           fi
           OPTIONS+=" -DBuildJK2SPEngine=ON -DBuildJK2SPGame=ON -DBuildJK2SPRdVanilla=ON"
           cmake $GITHUB_WORKSPACE $OPTIONS
@@ -242,6 +276,22 @@ jobs:
         working-directory: ${{ github.workspace }}/build
         shell: bash
         run: cmake --install .
+
+      - name: Verify macOS dependencies
+        if: ${{ matrix.build_type == 'Release' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          find "${{ github.workspace }}/install" -name '*.app' -type d -print
+
+          find "${{ github.workspace }}/install" -type f -perm +111 -print0 |
+            while IFS= read -r -d '' binary; do
+              if file "$binary" | grep -q 'Mach-O'; then
+                echo "Dependencies for $binary:"
+                otool -L "$binary"
+              fi
+            done
 
       - name: Create OpenJK binary archive
         if: ${{ matrix.build_type == 'Release' }}

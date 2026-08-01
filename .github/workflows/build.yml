@@ -278,6 +278,42 @@ jobs:
           ln -s "libSDL2-2.0.0.dylib" \
             "$SDL_PREFIX/lib/libSDL2.dylib"
 
+          cmake -E make_directory "$SDL_PREFIX/lib/cmake/SDL2"
+
+          cat > "$SDL_PREFIX/lib/cmake/SDL2/SDL2Config.cmake" <<'EOF'
+          get_filename_component(SDL2_PREFIX "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+
+          if(NOT TARGET SDL2::SDL2)
+            add_library(SDL2::SDL2 SHARED IMPORTED)
+            set_target_properties(SDL2::SDL2 PROPERTIES
+              IMPORTED_LOCATION "${SDL2_PREFIX}/lib/libSDL2-2.0.0.dylib"
+              INTERFACE_INCLUDE_DIRECTORIES "${SDL2_PREFIX}/include/SDL2"
+            )
+          endif()
+
+          if(NOT TARGET SDL2::SDL2main)
+            add_library(SDL2::SDL2main INTERFACE IMPORTED)
+          endif()
+
+          set(SDL2_FOUND TRUE)
+          set(SDL2_INCLUDE_DIRS "${SDL2_PREFIX}/include/SDL2")
+          set(SDL2_LIBRARIES SDL2::SDL2)
+          EOF
+
+          cat > "$SDL_PREFIX/lib/cmake/SDL2/SDL2ConfigVersion.cmake" <<EOF
+          set(PACKAGE_VERSION "${SDL2_VERSION}")
+
+          if(PACKAGE_FIND_VERSION VERSION_GREATER PACKAGE_VERSION)
+            set(PACKAGE_VERSION_COMPATIBLE FALSE)
+          else()
+            set(PACKAGE_VERSION_COMPATIBLE TRUE)
+
+            if(PACKAGE_FIND_VERSION VERSION_EQUAL PACKAGE_VERSION)
+              set(PACKAGE_VERSION_EXACT TRUE)
+            endif()
+          endif()
+          EOF
+
           codesign --force --sign - \
             "$SDL_PREFIX/lib/libSDL2-2.0.0.dylib"
 
@@ -295,6 +331,7 @@ jobs:
         run: |
           OPTIONS="-DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install"
           OPTIONS+=" -DCMAKE_PREFIX_PATH=${{ github.workspace }}/sdl-prefix"
+          OPTIONS+=" -DSDL2_DIR=${{ github.workspace }}/sdl-prefix/lib/cmake/SDL2"
           if [ "${{ matrix.portable }}" == "Portable" ]; then
             OPTIONS+=" -DUseInternalLibs=ON -DUseInternalSDL2=OFF -DBuildPortableVersion=ON"
           else

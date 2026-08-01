@@ -221,8 +221,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          brew install libjpeg libpng
-
           BUILD_DIR="${{ github.workspace }}/build"
           SDL_PREFIX="${{ github.workspace }}/sdl-prefix"
           SDL_DMG="${{ runner.temp }}/SDL2-${SDL2_VERSION}.dmg"
@@ -335,10 +333,13 @@ jobs:
           OPTIONS="-DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install"
           OPTIONS+=" -DCMAKE_PREFIX_PATH=${{ github.workspace }}/sdl-prefix"
           OPTIONS+=" -DSDL2_DIR=${{ github.workspace }}/sdl-prefix/lib/cmake/SDL2"
+          OPTIONS+=" -DUseInternalLibs=ON"
+          OPTIONS+=" -DUseInternalSDL2=OFF"
+
           if [ "${{ matrix.portable }}" == "Portable" ]; then
-            OPTIONS+=" -DUseInternalLibs=ON -DUseInternalSDL2=OFF -DBuildPortableVersion=ON"
+            OPTIONS+=" -DBuildPortableVersion=ON"
           else
-            OPTIONS+=" -DUseInternalLibs=OFF -DUseInternalSDL2=OFF -DBuildPortableVersion=OFF"
+            OPTIONS+=" -DBuildPortableVersion=OFF"
           fi
           OPTIONS+=" -DBuildJK2SPEngine=ON -DBuildJK2SPGame=ON -DBuildJK2SPRdVanilla=ON"
           cmake $GITHUB_WORKSPACE $OPTIONS
@@ -391,6 +392,7 @@ jobs:
                 otool -L "$BINARY"
 
                 if otool -L "$BINARY" |
+                  tail -n +2 |
                   grep -E '/opt/homebrew|/usr/local|/Users/runner|sdl-prefix'; then
                   echo "Found a non-portable dependency in $BINARY"
                   exit 1
@@ -398,6 +400,7 @@ jobs:
               fi
             done
 
+            codesign --force --deep --sign - "$APP"
             codesign --verify --deep --strict "$APP"
           done < "$APP_LIST"
 

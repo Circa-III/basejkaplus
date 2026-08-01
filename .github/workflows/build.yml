@@ -259,7 +259,7 @@ jobs:
           echo "Official SDL framework architectures:"
           lipo -archs "$SDL_FRAMEWORK_BINARY"
 
-          lipo -verify_arch x86_64 arm64 "$SDL_FRAMEWORK_BINARY"
+          lipo "$SDL_FRAMEWORK_BINARY" -verify_arch x86_64 arm64
 
           echo "Extracting the ${{ matrix.arch }} SDL2 library..."
           lipo "$SDL_FRAMEWORK_BINARY" \
@@ -339,7 +339,7 @@ jobs:
             echo "Checking $APP"
 
             test -f "$SDL_DYLIB"
-            lipo -verify_arch "${{ matrix.arch }}" "$SDL_DYLIB"
+            lipo "$SDL_DYLIB" -verify_arch "${{ matrix.arch }}"
 
             file "$SDL_DYLIB"
             otool -D "$SDL_DYLIB"

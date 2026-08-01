@@ -287,7 +287,7 @@ jobs:
             add_library(SDL2::SDL2 SHARED IMPORTED)
             set_target_properties(SDL2::SDL2 PROPERTIES
               IMPORTED_LOCATION "${SDL2_PREFIX}/lib/libSDL2-2.0.0.dylib"
-              INTERFACE_INCLUDE_DIRECTORIES "${SDL2_PREFIX}/include/SDL2"
+              INTERFACE_INCLUDE_DIRECTORIES "${SDL2_PREFIX}/include;${SDL2_PREFIX}/include/SDL2"
             )
           endif()
 
@@ -296,7 +296,10 @@ jobs:
           endif()
 
           set(SDL2_FOUND TRUE)
-          set(SDL2_INCLUDE_DIRS "${SDL2_PREFIX}/include/SDL2")
+          set(SDL2_INCLUDE_DIRS
+            "${SDL2_PREFIX}/include"
+            "${SDL2_PREFIX}/include/SDL2"
+          )
           set(SDL2_LIBRARIES SDL2::SDL2)
           EOF
 
